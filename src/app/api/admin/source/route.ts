@@ -10,7 +10,7 @@ import { IStorage } from '@/lib/types';
 export const runtime = 'edge';
 
 // 支持的操作类型
-type Action = 'add' | 'disable' | 'enable' | 'delete' | 'sort';
+type Action = 'add' | 'disable' | 'enable' | 'delete' | 'sort' | 'update';
 
 interface BaseBody {
   action?: Action;
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const username = authInfo.username;
 
     // 基础校验
-    const ACTIONS: Action[] = ['add', 'disable', 'enable', 'delete', 'sort'];
+    const ACTIONS: Action[] = ['add', 'disable', 'enable', 'delete', 'sort', 'update'];
     if (!username || !action || !ACTIONS.includes(action)) {
       return NextResponse.json({ error: '参数格式错误' }, { status: 400 });
     }
@@ -115,6 +115,31 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: '该源不可删除' }, { status: 400 });
         }
         adminConfig.SourceConfig.splice(idx, 1);
+        break;
+      }
+      case 'update': {
+        const { key, name, api, detail, is_adult } = body as {
+          key?: string;
+          name?: string;
+          api?: string;
+          detail?: string;
+          is_adult?: boolean;
+        };
+        if (!key || !name || !api) {
+          return NextResponse.json({ error: '缺少必要参数' }, { status: 400 });
+        }
+        const entry = adminConfig.SourceConfig.find((s) => s.key === key);
+        if (!entry) {
+          return NextResponse.json({ error: '源不存在' }, { status: 404 });
+        }
+        if (entry.from === 'config') {
+          return NextResponse.json({ error: '示例源不可修改' }, { status: 400 });
+        }
+        // 更新源信息
+        entry.name = name;
+        entry.api = api;
+        entry.detail = detail;
+        entry.is_adult = is_adult || false;
         break;
       }
       case 'sort': {

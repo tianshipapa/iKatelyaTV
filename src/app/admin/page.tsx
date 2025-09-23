@@ -628,15 +628,20 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
 const VideoSourceConfig = ({
   config,
   refreshConfig,
+  onShowDetail,
 }: {
   config: AdminConfig | null;
   refreshConfig: () => Promise<void>;
+  onShowDetail: (source: DataSource) => void;
 }) => {
   const [sources, setSources] = useState<DataSource[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [orderChanged, setOrderChanged] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  // Loading 状态管理
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
+  const [batchLoadingType, setBatchLoadingType] = useState<'enable' | 'disable' | 'delete' | null>(null);
   const [newSource, setNewSource] = useState<DataSource>({
     name: '',
     key: '',
@@ -693,13 +698,26 @@ const VideoSourceConfig = ({
     }
   };
 
-  const handleToggleEnable = (key: string) => {
+  const handleToggleEnable = async (key: string) => {
     const target = sources.find((s) => s.key === key);
     if (!target) return;
+    
+    // 设置 loading 状态
+    setLoadingStates(prev => ({ ...prev, [key]: true }));
+    
     const action = target.disabled ? 'enable' : 'disable';
-    callSourceApi({ action, key }).catch(() => {
+    try {
+      await callSourceApi({ action, key });
+    } catch (error) {
       console.error('操作失败', action, key);
-    });
+    } finally {
+      // 清除 loading 状态
+      setLoadingStates(prev => {
+        const newState = { ...prev };
+        delete newState[key];
+        return newState;
+      });
+    }
   };
 
   const handleDelete = (key: string) => {
@@ -788,6 +806,9 @@ const VideoSourceConfig = ({
 
     if (!result.isConfirmed) return;
 
+    // 设置批量 loading 状态
+    setBatchLoadingType('enable');
+
     // 批量启用逐个进行
     let successCount = 0;
     let errorCount = 0;
@@ -843,6 +864,8 @@ const VideoSourceConfig = ({
     }
 
     await refreshConfig();
+    // 清除批量 loading 状态
+    setBatchLoadingType(null);
   };
 
   const handleBatchDisable = async () => {
@@ -864,6 +887,9 @@ const VideoSourceConfig = ({
     });
 
     if (!result.isConfirmed) return;
+
+    // 设置批量 loading 状态
+    setBatchLoadingType('disable');
 
     // 批量禁用逐个进行
     let successCount = 0;
@@ -920,6 +946,8 @@ const VideoSourceConfig = ({
     }
 
     await refreshConfig();
+    // 清除批量 loading 状态
+    setBatchLoadingType(null);
   };
 
   const handleBatchDelete = async () => {
@@ -941,6 +969,9 @@ const VideoSourceConfig = ({
     });
 
     if (!result.isConfirmed) return;
+
+    // 设置批量 loading 状态
+    setBatchLoadingType('delete');
 
     // 批量删除逐个进行
     let successCount = 0;
@@ -1007,6 +1038,8 @@ const VideoSourceConfig = ({
     }
 
     await refreshConfig();
+    // 清除批量 loading 状态
+    setBatchLoadingType(null);
   };
 
   // 导出配置
@@ -1236,40 +1269,43 @@ const VideoSourceConfig = ({
         >
           {source.api}
         </td>
-        <td
-          className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 max-w-[8rem] truncate'
-          title={source.detail || '-'}
-        >
-          {source.detail || '-'}
-        </td>
-        <td className='px-6 py-4 whitespace-nowrap max-w-[1rem]'>
-          <span
-            className={`px-2 py-1 text-xs rounded-full ${
+        <td className='px-6 py-4 whitespace-nowrap text-center'>
+          <button
+            onClick={() => handleToggleEnable(source.key)}
+            disabled={loadingStates[source.key]}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
               !source.disabled
-                ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300'
-                : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+                ? 'bg-green-600'
+                : 'bg-gray-200 dark:bg-gray-700'
             }`}
           >
-            {!source.disabled ? '启用中' : '已禁用'}
-          </span>
+            {loadingStates[source.key] ? (
+              // Loading 动画
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : (
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  !source.disabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            )}
+          </button>
         </td>
         <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2'>
           <button
-            onClick={() => handleToggleEnable(source.key)}
-            className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
-              !source.disabled
-                ? 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60'
-                : 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/60'
-            } transition-colors`}
+            onClick={() => onShowDetail(source)}
+            className='inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors'
           >
-            {!source.disabled ? '禁用' : '启用'}
+            📝 编辑
           </button>
           {source.from !== 'config' ? (
             <button
               onClick={() => handleDelete(source.key)}
-              className='inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700/40 dark:hover:bg-gray-700/60 dark:text-gray-200 transition-colors'
+              className='inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors'
             >
-              删除
+              🗑️ 删除
             </button>
           ) : (
             <span className='inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400'>
@@ -1292,8 +1328,8 @@ const VideoSourceConfig = ({
   return (
     <div className='space-y-6'>
       {/* 视频源管理工具栏 */}
-      <div className='flex items-center justify-between flex-wrap gap-3'>
-        <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+      <div className='flex items-center justify-between mb-3'>
+        <h4 className='text-lg font-medium text-gray-700 dark:text-gray-300'>
           视频源列表
         </h4>
         
@@ -1356,26 +1392,47 @@ const VideoSourceConfig = ({
                 
                 <button
                   onClick={handleBatchEnable}
-                  disabled={selectedSources.size === 0}
-                  className='inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors'
+                  disabled={selectedSources.size === 0 || batchLoadingType !== null}
+                  className='inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors disabled:cursor-not-allowed'
                 >
-                  ✅ 批量启用
+                  {batchLoadingType === 'enable' ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                      正在处理...
+                    </>
+                  ) : (
+                    '✅ 批量启用'
+                  )}
                 </button>
                 
                 <button
                   onClick={handleBatchDisable}
-                  disabled={selectedSources.size === 0}
-                  className='inline-flex items-center px-3 py-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors'
+                  disabled={selectedSources.size === 0 || batchLoadingType !== null}
+                  className='inline-flex items-center px-3 py-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors disabled:cursor-not-allowed'
                 >
-                  ⛔ 批量禁用
+                  {batchLoadingType === 'disable' ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                      正在处理...
+                    </>
+                  ) : (
+                    '⛔ 批量禁用'
+                  )}
                 </button>
                 
                 <button
                   onClick={handleBatchDelete}
-                  disabled={selectedSources.size === 0}
-                  className='inline-flex items-center px-3 py-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors'
+                  disabled={selectedSources.size === 0 || batchLoadingType !== null}
+                  className='inline-flex items-center px-3 py-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors disabled:cursor-not-allowed'
                 >
-                  🗑️ 批量删除
+                  {batchLoadingType === 'delete' ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                      正在处理...
+                    </>
+                  ) : (
+                    '🗑️ 批量删除'
+                  )}
                 </button>
               </div>
             </>
@@ -1483,13 +1540,10 @@ const VideoSourceConfig = ({
               <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                 API 地址
               </th>
-              <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
-                Detail 地址
-              </th>
-              <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+              <th className='px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                 状态
               </th>
-              <th className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+              <th className='px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
                 操作
               </th>
             </tr>
@@ -1822,6 +1876,59 @@ function AdminPageClient() {
     videoSource: false,
     siteConfig: false,
   });
+  
+  // 视频源详情编辑模态框状态
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [editingSource, setEditingSource] = useState<DataSource | null>(null);
+
+  // 显示详情编辑模态框
+  const handleShowDetail = (source: DataSource) => {
+    setEditingSource({ ...source });
+    setShowDetailModal(true);
+  };
+
+  // 保存详情编辑
+  const handleSaveDetail = async () => {
+    if (!editingSource || !editingSource.name || !editingSource.key || !editingSource.api) {
+      showError('请填写完整的名称、Key和API地址');
+      return;
+    }
+
+    try {
+      // 使用新的update API
+      const requestData: Record<string, any> = {
+        action: 'update',
+        key: editingSource.key,
+        name: editingSource.name,
+        api: editingSource.api,
+        detail: editingSource.detail || '',
+        is_adult: editingSource.is_adult || false
+      };
+      
+      console.log('发送更新请求:', requestData);
+      
+      const resp = await fetch('/api/admin/source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        console.error('响应错误:', resp.status, data);
+        throw new Error(data.error || `操作失败: ${resp.status}`);
+      }
+
+      setShowDetailModal(false);
+      setEditingSource(null);
+      showSuccess('修改成功');
+      // 刷新配置
+      await fetchConfig(false);
+    } catch (error) {
+      console.error('保存错误:', error);
+      showError('保存失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    }
+  };
 
   // 获取管理员配置
   // showLoading 用于控制是否在请求期间显示整体加载骨架。
@@ -1982,10 +2089,163 @@ function AdminPageClient() {
               isExpanded={expandedTabs.videoSource}
               onToggle={() => toggleTab('videoSource')}
             >
-              <VideoSourceConfig config={config} refreshConfig={fetchConfig} />
+              <VideoSourceConfig config={config} refreshConfig={fetchConfig} onShowDetail={handleShowDetail} />
             </CollapsibleTab>
           </div>
         </div>
+        
+        {/* 视频源详情编辑模态框 */}
+        {showDetailModal && editingSource && (
+          <div className='fixed inset-0 bg-black/30 backdrop-blur-sm flex items-start justify-center z-50 overflow-y-auto p-2 sm:p-4'>
+            <div className='w-full max-w-md sm:max-w-lg mx-auto my-4 sm:my-8'>
+              {/* 彩色边框容器 */}
+              <div className='bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 p-1 rounded-2xl shadow-2xl'>
+                <div className='bg-white dark:bg-gray-800 rounded-xl flex flex-col'>
+                  {/* 模态框头部 */}
+                  <div className='bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 px-3 py-2 border-b border-gray-200 dark:border-gray-600 rounded-t-xl flex-shrink-0'>
+                    <div className='flex items-center justify-between'>
+                      <div className='flex items-center space-x-2 min-w-0 flex-1'>
+                        <div className='w-5 h-5 sm:w-6 sm:h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0'>
+                          <span className='text-white text-xs'>📝</span>
+                        </div>
+                        <div className='min-w-0 flex-1'>
+                          <h3 className='text-sm font-bold text-gray-900 dark:text-gray-100 truncate'>
+                            编辑
+                          </h3>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          setEditingSource(null);
+                        }}
+                        className='w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all duration-200 flex items-center justify-center flex-shrink-0'
+                      >
+                        <span className='text-xs'>✕</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* 模态框内容 */}
+                  <div className='px-3 py-3'>
+                    <div className='space-y-3'>
+                      <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+                        <div>
+                          <label className='block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                            📝 名称
+                          </label>
+                          <input
+                            type='text'
+                            value={editingSource.name}
+                            onChange={(e) =>
+                              setEditingSource(prev => prev ? { ...prev, name: e.target.value } : null)
+                            }
+                            className='w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm'
+                            placeholder='请输入视频源名称'
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className='block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                            🔑 Key
+                          </label>
+                          <input
+                            type='text'
+                            value={editingSource.key}
+                            disabled={editingSource.from === 'config'}
+                            onChange={(e) =>
+                              setEditingSource(prev => prev ? { ...prev, key: e.target.value } : null)
+                            }
+                            className={`w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm ${
+                              editingSource.from === 'config' ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-600' : ''
+                            }`}
+                            placeholder='请输入视频源Key'
+                          />
+                          {editingSource.from === 'config' && (
+                            <p className='text-xs text-amber-600 dark:text-amber-400 mt-0.5'>⚠️ 示例源Key不可修改</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className='block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                          🔗 API 地址
+                        </label>
+                        <input
+                          type='text'
+                          value={editingSource.api}
+                          onChange={(e) =>
+                            setEditingSource(prev => prev ? { ...prev, api: e.target.value } : null)
+                          }
+                          className='w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm'
+                          placeholder='请输入API地址'
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className='block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                          📄 Detail 地址 <span className='text-xs bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 px-1 py-0.5 rounded ml-1'>选填</span>
+                        </label>
+                        <input
+                          type='text'
+                          value={editingSource.detail || ''}
+                          onChange={(e) =>
+                            setEditingSource(prev => prev ? { ...prev, detail: e.target.value } : null)
+                          }
+                          className='w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm'
+                          placeholder='请输入Detail地址（可选）'
+                        />
+                      </div>
+                      
+                      <div className='bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-lg p-2.5 border border-red-200 dark:border-red-700'>
+                        <div className='flex items-center space-x-2'>
+                          <input
+                            type='checkbox'
+                            id='edit_is_adult'
+                            checked={editingSource.is_adult || false}
+                            onChange={(e) =>
+                              setEditingSource(prev => prev ? { ...prev, is_adult: e.target.checked } : null)
+                            }
+                            className='w-4 h-4 text-red-600 bg-gray-100 border border-gray-300 rounded focus:ring-red-500 dark:bg-gray-700 dark:border-gray-600 transition-all flex-shrink-0'
+                          />
+                          <label
+                            htmlFor='edit_is_adult'
+                            className='text-xs font-medium text-gray-900 dark:text-gray-300 cursor-pointer flex-1'
+                          >
+                            🔞 成人内容资源站
+                            <span className='block text-xs text-gray-500 dark:text-gray-400 mt-0.5'>启用后将对未成年人隐藏</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 模态框底部按钮 */}
+                  <div className='bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-gray-600 px-3 py-2.5 border-t border-gray-200 dark:border-gray-600 rounded-b-xl'>
+                    <div className='flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-2'>
+                      <button
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          setEditingSource(null);
+                        }}
+                        className='inline-flex items-center justify-center px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 rounded-lg transition-all font-medium text-sm'
+                      >
+                        ← 返回
+                      </button>
+                      
+                      <button
+                        onClick={handleSaveDetail}
+                        className='inline-flex items-center justify-center px-6 py-2 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 text-white rounded-lg transition-all font-medium shadow-lg hover:shadow-xl text-sm'
+                      >
+                        ✓ 保存修改
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </PageLayout>
   );

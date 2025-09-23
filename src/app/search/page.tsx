@@ -165,50 +165,6 @@ function SearchPageClient() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
 
-    // 监听搜索历史更新事件
-    const unsubscribe = subscribeToDataUpdates(
-      'searchHistoryUpdated',
-      (newHistory: string[]) => {
-        setSearchHistory(newHistory);
-      }
-    );
-
-    // 获取滚动位置的函数 - 专门针对 body 滚动
-    const getScrollTop = () => {
-      return document.body.scrollTop || 0;
-    };
-
-    // 使用 requestAnimationFrame 持续检测滚动位置
-    let isRunning = false;
-    const checkScrollPosition = () => {
-      if (!isRunning) return;
-
-      const scrollTop = getScrollTop();
-      const shouldShow = scrollTop > 300;
-      setShowBackToTop(shouldShow);
-
-      requestAnimationFrame(checkScrollPosition);
-    };
-
-    // 启动持续检测
-    isRunning = true;
-    checkScrollPosition();
-
-    // 监听 body 元素的滚动事件
-    const handleScroll = () => {
-      const scrollTop = getScrollTop();
-      setShowBackToTop(scrollTop > 300);
-    };
-
-    document.body.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      unsubscribe();
-      isRunning = false; // 停止 requestAnimationFrame 循环
-
-      // 移除 body 滚动事件监听器
-      document.body.removeEventListener('scroll', handleScroll);
-    };
   }, []);
 
   useEffect(() => {
@@ -356,9 +312,9 @@ function SearchPageClient() {
                     <button
                       type='button'
                       onClick={() => setShowSourceDropdown(!showSourceDropdown)}
-                      className={`flex items-center gap-1 px-3 py-1.5 text-xs rounded-md border transition-all duration-200 bg-gradient-to-r from-gray-100 to-gray-50 border-gray-300 text-gray-700 hover:from-gray-200 hover:to-gray-100 dark:bg-gradient-to-r dark:from-gray-700 dark:to-gray-600 dark:border-gray-600 dark:text-gray-300`}
+                      className="flex items-center gap-1 px-2 py-1.5 text-xs rounded-md border transition-all duration-200 bg-gradient-to-r from-gray-100 to-gray-50 border-gray-300 text-gray-700 hover:from-gray-200 hover:to-gray-100 dark:bg-gradient-to-r dark:from-gray-700 dark:to-gray-600 dark:border-gray-600 dark:text-gray-300"
                     >
-                      <span className='max-w-20 truncate font-medium'>
+                      <span className='max-w-12 truncate font-medium text-xs'>
                         {getSelectedSourcesText()}
                       </span>
                       <svg className={`w-3 h-3 transition-transform duration-200 ${
@@ -460,7 +416,7 @@ function SearchPageClient() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder='搜索电影、电视剧...'
                 className={`w-full h-12 rounded-lg bg-gray-50/80 py-3 pr-4 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-400 focus:bg-white border border-gray-200/50 shadow-sm dark:bg-gray-800 dark:text-gray-300 dark:placeholder-gray-500 dark:focus:bg-gray-700 dark:border-gray-700 ${
-                  availableSources.length > 0 ? 'pl-32' : 'pl-10'
+                  availableSources.length > 0 ? 'pl-24' : 'pl-10'
                 }`}
               />
             </div>
