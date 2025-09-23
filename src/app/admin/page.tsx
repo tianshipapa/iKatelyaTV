@@ -768,6 +768,160 @@ const VideoSourceConfig = ({
     }
   };
 
+  const handleBatchEnable = async () => {
+    if (selectedSources.size === 0) {
+      showError('请先选择要启用的视频源');
+      return;
+    }
+
+    const selectedArray = Array.from(selectedSources);
+    const result = await Swal.fire({
+      title: '确认批量启用',
+      text: `即将启用 ${selectedArray.length} 个视频源`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: '确认启用',
+      cancelButtonText: '取消',
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#6b7280'
+    });
+
+    if (!result.isConfirmed) return;
+
+    // 批量启用逐个进行
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < selectedArray.length; i++) {
+      const key = selectedArray[i];
+      try {
+        await callSourceApi({ action: 'enable', key });
+        successCount++;
+        
+        // 显示进度
+        if (selectedArray.length > 1) {
+          Swal.update({
+            title: '正在启用...',
+            text: `进度: ${i + 1}/${selectedArray.length}`,
+            showConfirmButton: false,
+            showCancelButton: false,
+            allowOutsideClick: false
+          });
+        }
+      } catch (error) {
+        errorCount++;
+        const sourceName = sources.find(s => s.key === key)?.name || key;
+        errors.push(`${sourceName}: ${error instanceof Error ? error.message : '启用失败'}`);
+      }
+    }
+
+    // 显示启用结果
+    if (errorCount === 0) {
+      showSuccess(`成功启用 ${successCount} 个视频源`);
+      setSelectedSources(new Set()); // 清空选择
+    } else {
+      await Swal.fire({
+        title: '启用完成',
+        html: `
+          <div class="text-left">
+            <p class="text-green-600 mb-2">✅ 成功启用: ${successCount} 个</p>
+            <p class="text-red-600 mb-2">❌ 启用失败: ${errorCount} 个</p>
+            ${errors.length > 0 ? `
+              <details class="mt-3">
+                <summary class="cursor-pointer text-gray-600">查看错误详情</summary>
+                <div class="mt-2 text-sm text-gray-500 max-h-32 overflow-y-auto">
+                  ${errors.map(err => `<div class="py-1">${err}</div>`).join('')}
+                </div>
+              </details>
+            ` : ''}
+          </div>
+        `,
+        icon: successCount > 0 ? 'warning' : 'error',
+        confirmButtonText: '确定'
+      });
+    }
+
+    await refreshConfig();
+  };
+
+  const handleBatchDisable = async () => {
+    if (selectedSources.size === 0) {
+      showError('请先选择要禁用的视频源');
+      return;
+    }
+
+    const selectedArray = Array.from(selectedSources);
+    const result = await Swal.fire({
+      title: '确认批量禁用',
+      text: `即将禁用 ${selectedArray.length} 个视频源`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '确认禁用',
+      cancelButtonText: '取消',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280'
+    });
+
+    if (!result.isConfirmed) return;
+
+    // 批量禁用逐个进行
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < selectedArray.length; i++) {
+      const key = selectedArray[i];
+      try {
+        await callSourceApi({ action: 'disable', key });
+        successCount++;
+        
+        // 显示进度
+        if (selectedArray.length > 1) {
+          Swal.update({
+            title: '正在禁用...',
+            text: `进度: ${i + 1}/${selectedArray.length}`,
+            showConfirmButton: false,
+            showCancelButton: false,
+            allowOutsideClick: false
+          });
+        }
+      } catch (error) {
+        errorCount++;
+        const sourceName = sources.find(s => s.key === key)?.name || key;
+        errors.push(`${sourceName}: ${error instanceof Error ? error.message : '禁用失败'}`);
+      }
+    }
+
+    // 显示禁用结果
+    if (errorCount === 0) {
+      showSuccess(`成功禁用 ${successCount} 个视频源`);
+      setSelectedSources(new Set()); // 清空选择
+    } else {
+      await Swal.fire({
+        title: '禁用完成',
+        html: `
+          <div class="text-left">
+            <p class="text-green-600 mb-2">✅ 成功禁用: ${successCount} 个</p>
+            <p class="text-red-600 mb-2">❌ 禁用失败: ${errorCount} 个</p>
+            ${errors.length > 0 ? `
+              <details class="mt-3">
+                <summary class="cursor-pointer text-gray-600">查看错误详情</summary>
+                <div class="mt-2 text-sm text-gray-500 max-h-32 overflow-y-auto">
+                  ${errors.map(err => `<div class="py-1">${err}</div>`).join('')}
+                </div>
+              </details>
+            ` : ''}
+          </div>
+        `,
+        icon: successCount > 0 ? 'warning' : 'error',
+        confirmButtonText: '确定'
+      });
+    }
+
+    await refreshConfig();
+  };
+
   const handleBatchDelete = async () => {
     if (selectedSources.size === 0) {
       showError('请先选择要删除的视频源');
@@ -788,7 +942,7 @@ const VideoSourceConfig = ({
 
     if (!result.isConfirmed) return;
 
-    // 批量删除逐个进行，显示进度
+    // 批量删除逐个进行
     let successCount = 0;
     let errorCount = 0;
     const errors: string[] = [];
@@ -1199,6 +1353,22 @@ const VideoSourceConfig = ({
                 <span className='text-xs text-gray-500 dark:text-gray-400'>
                   已选 {selectedSources.size} 个
                 </span>
+                
+                <button
+                  onClick={handleBatchEnable}
+                  disabled={selectedSources.size === 0}
+                  className='inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors'
+                >
+                  ✅ 批量启用
+                </button>
+                
+                <button
+                  onClick={handleBatchDisable}
+                  disabled={selectedSources.size === 0}
+                  className='inline-flex items-center px-3 py-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors'
+                >
+                  ⛔ 批量禁用
+                </button>
                 
                 <button
                   onClick={handleBatchDelete}
