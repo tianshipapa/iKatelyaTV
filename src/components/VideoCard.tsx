@@ -98,6 +98,7 @@ export default function VideoCard({
   const actualTitle = aggregateData?.first.title ?? title;
   const actualPoster = aggregateData?.first.poster ?? poster;
   const actualSource = aggregateData?.first.source ?? source;
+  const actualSourceName = aggregateData?.first.source_name ?? source_name;
   const actualId = aggregateData?.first.id ?? id;
   const actualDoubanId = String(
     aggregateData?.mostFrequentDoubanId ?? douban_id
@@ -154,7 +155,7 @@ export default function VideoCard({
           // 如果未收藏，添加收藏
           await saveFavorite(actualSource, actualId, {
             title: actualTitle,
-            source_name: source_name || '',
+            source_name: actualSourceName || '',
             year: actualYear || '',
             cover: actualPoster,
             total_episodes: actualEpisodes ?? 1,
@@ -171,7 +172,7 @@ export default function VideoCard({
       actualSource,
       actualId,
       actualTitle,
-      source_name,
+      actualSourceName,
       actualYear,
       actualPoster,
       actualEpisodes,
@@ -323,6 +324,17 @@ export default function VideoCard({
           </div>
         )}
 
+        {/* 来源徽章（在搜索模式下总是显示） */}
+        {from === 'search' && (
+          <div className='absolute top-2 left-2 opacity-90 group-hover:opacity-100 transition-opacity duration-300'>
+            <div className='bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs font-medium px-2 py-1 rounded-md shadow-lg backdrop-blur-sm border border-white/20'>
+              <span className='drop-shadow-sm'>
+                {actualSourceName || actualSource || '未知来源'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* 徽章 */}
         {config.showRating && rate && (
           <div className='absolute top-2 right-2 bg-pink-500 text-white text-xs font-bold w-7 h-7 rounded-full flex items-center justify-center shadow-md transition-all duration-300 ease-out group-hover:scale-110'>
@@ -345,7 +357,9 @@ export default function VideoCard({
             target='_blank'
             rel='noopener noreferrer'
             onClick={(e) => e.stopPropagation()}
-            className='absolute top-2 left-2 opacity-0 -translate-x-2 transition-all duration-300 ease-in-out delay-100 group-hover:opacity-100 group-hover:translate-x-0'
+            className={`absolute opacity-0 -translate-x-2 transition-all duration-300 ease-in-out delay-100 group-hover:opacity-100 group-hover:translate-x-0 ${
+              from === 'search' ? 'top-12 left-2' : 'top-2 left-2'
+            }`}
           >
             <div className='bg-green-500 text-white text-xs font-bold w-7 h-7 rounded-full flex items-center justify-center shadow-md hover:bg-green-600 hover:scale-[1.1] transition-all duration-300 ease-out'>
               <Link size={16} />
@@ -376,13 +390,6 @@ export default function VideoCard({
             <div className='absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800'></div>
           </div>
         </div>
-        {config.showSourceName && source_name && (
-          <span className='block text-xs text-gray-500 dark:text-gray-400 mt-1'>
-            <span className='inline-block border rounded px-2 py-0.5 border-gray-500/60 dark:border-gray-400/60 transition-all duration-300 ease-in-out group-hover:border-green-500/60 group-hover:text-green-600 dark:group-hover:text-green-400'>
-              {source_name}
-            </span>
-          </span>
-        )}
       </div>
     </div>
   );

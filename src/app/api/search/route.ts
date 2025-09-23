@@ -15,6 +15,8 @@ export async function OPTIONS() {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q');
+  const sourceFilter = searchParams.get('source'); // 单个视频源筛选
+  const sourcesFilter = searchParams.get('sources'); // 多个视频源筛选（逗号分隔）
   
   // 从 Authorization header 或 query parameter 获取用户名
   let userName: string | undefined = searchParams.get('user') || undefined;
@@ -65,9 +67,50 @@ export async function GET(request: Request) {
     const finalShouldFilter = shouldFilterAdult || !includeAdult;
     
     // 使用动态过滤方法，但不依赖缓存，实时获取设置
-    const availableSites = finalShouldFilter 
+    let availableSites = finalShouldFilter 
       ? await getAvailableApiSites(true) // 过滤成人内容
       : await getAvailableApiSites(false); // 不过滤成人内容
+    
+    // 如果指定了视频源，只搜索该源或者指定的多个源
+    if (sourcesFilter && sourcesFilter.trim() !== '') {
+      // 多个视频源模式
+      const requestedSources = sourcesFilter.trim().split(',').filter(s => s.trim() !== '');
+      availableSites = availableSites.filter(site => requestedSources.includes(site.key));
+      
+      if (availableSites.length === 0) {
+        const cacheTime = await getCacheTime();
+        const response = NextResponse.json({ 
+          regular_results: [], 
+          adult_results: [],
+          error: '指定的视频源都不存在或不可用'
+        }, {
+          headers: {
+            'Cache-Control': `public, max-age=${cacheTime}, s-maxage=${cacheTime}`,
+            'CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+            'Vercel-CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+          },
+        });
+        return addCorsHeaders(response);
+      }
+    } else if (sourceFilter && sourceFilter.trim() !== '') {
+      // 单个视频源模式
+      availableSites = availableSites.filter(site => site.key === sourceFilter.trim());
+      if (availableSites.length === 0) {
+        const cacheTime = await getCacheTime();
+        const response = NextResponse.json({ 
+          regular_results: [], 
+          adult_results: [],
+          error: '指定的视频源不存在或不可用'
+        }, {
+          headers: {
+            'Cache-Control': `public, max-age=${cacheTime}, s-maxage=${cacheTime}`,
+            'CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+            'Vercel-CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+          },
+        });
+        return addCorsHeaders(response);
+      }
+    }
     
     if (!availableSites || availableSites.length === 0) {
       const cacheTime = await getCacheTime();
@@ -85,8 +128,14 @@ export async function GET(request: Request) {
     }
 
     // 搜索所有可用的资源站（已根据用户设置动态过滤）
-    const searchPromises = availableSites.map((site) => searchFromApi(site, query));
+    const searchPromises = availableSites.map((site) => {
+      console.log(`搜索视频源: ${site.key} - ${site.name}`); // 调试信息
+      return searchFromApi(site, query);
+    });
     const searchResults = (await Promise.all(searchPromises)).flat();
+    
+    // 调试：检查搜索结果中的source_name
+    console.log('\u641c索结果样本:', searchResults.slice(0, 2).map(r => ({title: r.title, source: r.source, source_name: r.source_name})));
 
     // 所有结果都作为常规结果返回，因为成人内容源已经在源头被过滤掉了
     const cacheTime = await getCacheTime();
