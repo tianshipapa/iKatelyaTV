@@ -11,7 +11,6 @@ import {
   clearSearchHistory,
   deleteSearchHistory,
   getSearchHistory,
-  subscribeToDataUpdates,
 } from '@/lib/db.client';
 import { SearchResult } from '@/lib/types';
 
@@ -302,123 +301,121 @@ function SearchPageClient() {
         {/* 搜索框 */}
         <div className='mb-8'>
           <form onSubmit={handleSearch} className='max-w-2xl mx-auto'>
-            <div className='relative'>
-              <Search className='absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400 dark:text-gray-500' />
-              
-              {/* 视频源选择器（可收缩） */}
+            <div className='flex items-center gap-3'>
+              {/* 视频源选择器（移到搜索框外面） */}
               {availableSources.length > 0 && (
-                <div className='absolute left-10 top-1/2 -translate-y-1/2 z-10 source-dropdown'>
-                  <div className='relative'>
-                    <button
-                      type='button'
-                      onClick={() => setShowSourceDropdown(!showSourceDropdown)}
-                      className="flex items-center gap-1 px-2 py-1.5 text-xs rounded-md border transition-all duration-200 bg-gradient-to-r from-gray-100 to-gray-50 border-gray-300 text-gray-700 hover:from-gray-200 hover:to-gray-100 dark:bg-gradient-to-r dark:from-gray-700 dark:to-gray-600 dark:border-gray-600 dark:text-gray-300"
-                    >
-                      <span className='max-w-12 truncate font-medium text-xs'>
-                        {getSelectedSourcesText()}
-                      </span>
-                      <svg className={`w-3 h-3 transition-transform duration-200 ${
-                        showSourceDropdown ? 'rotate-180' : ''
-                      }`} fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
-                      </svg>
-                    </button>
-                    
-                    {/* 下拉菜单 */}
-                    {showSourceDropdown && (
-                      <div className='absolute top-full left-0 mt-2 w-56 max-h-80 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-xl z-20 dark:bg-gray-800 dark:border-gray-600'>
-                        {/* 源列表 */}
-                        <div className='max-h-60 overflow-y-auto'>
-                          {/* 全部源选项 */}
-                          <button
-                            type='button'
-                            onClick={() => {
-                              setSelectedSource('');
-                              setShowSourceDropdown(false);
-                              // 如果当前有搜索内容，自动触发搜索
-                              if (searchQuery.trim()) {
-                                const trimmed = searchQuery.trim();
-                                // 传递空字符串作为source参数，表示搜索所有源
-                                fetchSearchResults(trimmed, '');
-                              }
-                            }}
-                            className={`w-full text-left px-4 py-3 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors duration-150 flex items-center gap-3 ${
-                              selectedSource === '' 
-                                ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500 dark:bg-blue-900/30 dark:text-blue-300' 
-                                : 'text-gray-700 dark:text-gray-300'
-                            }`}
-                          >
-                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                              selectedSource === ''
-                                ? 'bg-blue-500 border-blue-500'
-                                : 'border-gray-300 dark:border-gray-600'
-                            }`}>
-                              {selectedSource === '' && (
-                                <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
-                                  <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
-                                </svg>
-                              )}
-                            </div>
-                            <span className='font-medium'>全部视频源</span>
-                            <div className='ml-auto px-2 py-1 bg-gray-100 dark:bg-gray-600 rounded-full text-xs text-gray-600 dark:text-gray-400'>
-                              {availableSources.length}
-                            </div>
-                          </button>
+                <div className='relative source-dropdown flex-shrink-0'>
+                  <button
+                    type='button'
+                    onClick={() => setShowSourceDropdown(!showSourceDropdown)}
+                    className='flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg border transition-all duration-200 bg-white hover:bg-gray-50 border-gray-300 text-gray-700 shadow-sm dark:bg-gray-800 dark:hover:bg-gray-700 dark:border-gray-600 dark:text-gray-300 min-w-[120px] justify-between'
+                  >
+                    <span className='truncate font-medium'>
+                      {getSelectedSourcesText()}
+                    </span>
+                    <svg className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ${
+                      showSourceDropdown ? 'rotate-180' : ''
+                    }`} fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
+                    </svg>
+                  </button>
+                  
+                  {/* 下拉菜单 */}
+                  {showSourceDropdown && (
+                    <div className='absolute top-full left-0 mt-2 w-64 max-h-80 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-xl z-20 dark:bg-gray-800 dark:border-gray-600'>
+                      {/* 源列表 */}
+                      <div className='max-h-60 overflow-y-auto'>
+                        {/* 全部源选项 */}
+                        <button
+                          type='button'
+                          onClick={() => {
+                            setSelectedSource('');
+                            setShowSourceDropdown(false);
+                            // 如果当前有搜索内容，自动触发搜索
+                            if (searchQuery.trim()) {
+                              const trimmed = searchQuery.trim();
+                              // 传递空字符串作为source参数，表示搜索所有源
+                              fetchSearchResults(trimmed, '');
+                            }
+                          }}
+                          className={`w-full text-left px-4 py-3 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors duration-150 flex items-center gap-3 ${
+                            selectedSource === '' 
+                              ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500 dark:bg-blue-900/30 dark:text-blue-300' 
+                              : 'text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                            selectedSource === ''
+                              ? 'bg-blue-500 border-blue-500'
+                              : 'border-gray-300 dark:border-gray-600'
+                          }`}>
+                            {selectedSource === '' && (
+                              <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
+                                <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
+                              </svg>
+                            )}
+                          </div>
+                          <span className='font-medium'>全部视频源</span>
+                          <div className='ml-auto px-2 py-1 bg-gray-100 dark:bg-gray-600 rounded-full text-xs text-gray-600 dark:text-gray-400'>
+                            {availableSources.length}
+                          </div>
+                        </button>
+                        
+                        {/* 各个视频源选项 */}
+                        {availableSources.map((source, index) => {
+                          const isSelected = selectedSource === source.key;
                           
-                          {/* 各个视频源选项 */}
-                          {availableSources.map((source, index) => {
-                            const isSelected = selectedSource === source.key;
-                            
-                            return (
-                              <button
-                                key={source.key}
-                                type='button'
-                                onClick={() => handleSourceToggle(source.key)}
-                                className={`w-full text-left px-4 py-3 text-sm hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors duration-150 flex items-center gap-3 ${
-                                  isSelected
-                                    ? 'bg-green-50 text-green-700 border-r-2 border-green-500 dark:bg-green-900/30 dark:text-green-300'
-                                    : 'text-gray-700 dark:text-gray-300'
-                                }`}
-                              >
-                                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                                  isSelected
-                                    ? 'bg-green-500 border-green-500'
-                                    : 'border-gray-300 dark:border-gray-600'
-                                }`}>
-                                  {isSelected && (
-                                    <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
-                                      <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
-                                    </svg>
-                                  )}
-                                </div>
-                                <span className='font-medium'>{source.name}</span>
-                                <div className={`ml-auto w-3 h-3 rounded-full ${
-                                  index % 6 === 0 ? 'bg-red-400' :
-                                  index % 6 === 1 ? 'bg-blue-400' :
-                                  index % 6 === 2 ? 'bg-green-400' :
-                                  index % 6 === 3 ? 'bg-yellow-400' :
-                                  index % 6 === 4 ? 'bg-purple-400' : 'bg-pink-400'
-                                }`} />
-                              </button>
-                            );
-                          })}
-                        </div>
+                          return (
+                            <button
+                              key={source.key}
+                              type='button'
+                              onClick={() => handleSourceToggle(source.key)}
+                              className={`w-full text-left px-4 py-3 text-sm hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors duration-150 flex items-center gap-3 ${
+                                isSelected
+                                  ? 'bg-green-50 text-green-700 border-r-2 border-green-500 dark:bg-green-900/30 dark:text-green-300'
+                                  : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                                isSelected
+                                  ? 'bg-green-500 border-green-500'
+                                  : 'border-gray-300 dark:border-gray-600'
+                              }`}>
+                                {isSelected && (
+                                  <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
+                                    <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
+                                  </svg>
+                                )}
+                              </div>
+                              <span className='font-medium'>{source.name}</span>
+                              <div className={`ml-auto w-3 h-3 rounded-full ${
+                                index % 6 === 0 ? 'bg-red-400' :
+                                index % 6 === 1 ? 'bg-blue-400' :
+                                index % 6 === 2 ? 'bg-green-400' :
+                                index % 6 === 3 ? 'bg-yellow-400' :
+                                index % 6 === 4 ? 'bg-purple-400' : 'bg-pink-400'
+                              }`} />
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
               
-              <input
-                id='searchInput'
-                type='text'
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder='搜索电影、电视剧...'
-                className={`w-full h-12 rounded-lg bg-gray-50/80 py-3 pr-4 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-400 focus:bg-white border border-gray-200/50 shadow-sm dark:bg-gray-800 dark:text-gray-300 dark:placeholder-gray-500 dark:focus:bg-gray-700 dark:border-gray-700 ${
-                  availableSources.length > 0 ? 'pl-24' : 'pl-10'
-                }`}
-              />
+              {/* 搜索框 */}
+              <div className='relative flex-1'>
+                <Search className='absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400 dark:text-gray-500' />
+                <input
+                  id='searchInput'
+                  type='text'
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder='搜索电影、电视剧...'
+                  className='w-full h-12 pl-10 pr-4 rounded-lg bg-gray-50/80 py-3 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-400 focus:bg-white border border-gray-200/50 shadow-sm dark:bg-gray-800 dark:text-gray-300 dark:placeholder-gray-500 dark:focus:bg-gray-700 dark:border-gray-700'
+                />
+              </div>
             </div>
           </form>
         </div>

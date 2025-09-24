@@ -115,4 +115,234 @@
   .animated-underline:focus-visible {
     background-size: 0 2px, 100% 2px;
   }
+
+  /* 横向滚动条样式 */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .scrollbar-thumb-purple-300::-webkit-scrollbar-thumb {
+    background-color: rgb(196 181 253);
+    border-radius: 3px;
+  }
+
+  .dark .scrollbar-thumb-purple-600::-webkit-scrollbar-thumb {
+    background-color: rgb(147 51 234);
+  }
+
+  .scrollbar-track-transparent::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(168 85 247);
+  }
+}
+
+/* 分类树组件动画增强 - 腾讯视频风格 */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 腾讯视频风格的分类按钮 */
+.tencent-category-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tencent-category-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.tencent-category-button:hover::before {
+  left: 100%;
+}
+
+/* 分类组hover效果 */
+.category-group {
+  transition: all 0.3s ease;
+}
+
+.category-group:hover {
+  transform: translateX(4px);
+}
+
+/* 分割线动画 */
+.category-divider {
+  transition: all 0.3s ease;
+  transform-origin: left;
+}
+
+.category-group:hover .category-divider {
+  transform: scaleX(1.5);
+}
+
+/* 加载骨架屏效果 */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 400% 100%;
+}
+
+/* 主分类标题动画 */
+.main-category-title {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.main-category-title::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+  transition: width 0.3s ease;
+}
+
+.main-category-title.active::after {
+  width: 100%;
+}
+
+/* 子分类按钮弹性动画 */
+.child-category-button {
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.child-category-button:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.15);
+}
+
+.child-category-button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* 箭头指示器动画 */
+.arrow-indicator {
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* 红色主题色彩 */
+.text-tencent {
+  color: #ff0000;
+}
+
+.bg-tencent {
+  background-color: #ff0000;
+}
+
+.border-tencent {
+  border-color: #ff0000;
+}
+
+/* 分类折叠动画 */
+.category-collapse {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: top;
+}
+
+.category-collapse.collapsed {
+  max-height: 0 !important;
+  opacity: 0;
+  transform: scaleY(0.8);
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.category-collapse.expanded {
+  transform: scaleY(1);
+}
+
+/* 折叠按钮动画 */
+.collapse-button {
+  transition: all 0.3s ease;
+}
+
+.collapse-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.collapse-button svg {
+  transition: transform 0.3s ease;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .category-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .category-group:hover {
+    transform: none;
+  }
+
+  .collapse-button {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
 }

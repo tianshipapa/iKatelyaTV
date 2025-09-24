@@ -19,6 +19,7 @@ import { DoubanItem } from '@/lib/types';
 
 import CapsuleSwitch from '@/components/CapsuleSwitch';
 import ContinueWatching from '@/components/ContinueWatching';
+import HorizontalCategoryTree from '@/components/HorizontalCategoryTree';
 import PageLayout from '@/components/PageLayout';
 import PaginatedRow from '@/components/PaginatedRow';
 import { useSite } from '@/components/SiteProvider';
@@ -75,7 +76,7 @@ const BottomKatelyaLogo = () => {
 };
 
 function HomeClient() {
-  const [activeTab, setActiveTab] = useState<'home' | 'favorites'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'favorites' | 'sources'>('home');
   const [hotMovies, setHotMovies] = useState<DoubanItem[]>([]);
   const [hotTvShows, setHotTvShows] = useState<DoubanItem[]>([]);
   const [hotVarietyShows, setHotVarietyShows] = useState<DoubanItem[]>([]);
@@ -124,6 +125,23 @@ function HomeClient() {
   };
 
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
+
+  // 指定源相关状态
+  const [availableSources, setAvailableSources] = useState<{key: string, name: string}[]>([]);
+  const [selectedSource, setSelectedSource] = useState<string>('');
+  const [sourceCategories, setSourceCategories] = useState<{id: string, name: string}[]>([]);
+  const [sourceCategoryTree, setSourceCategoryTree] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sourceVideos, setSourceVideos] = useState<any[]>([]);
+  const [sourceLoading, setSourceLoading] = useState(false);
+  const [sourcePage, setSourcePage] = useState(1);
+  const [sourcePagination, setSourcePagination] = useState<any>(null);
+  
+  // 指定源搜索相关状态
+  const [sourceSearchQuery, setSourceSearchQuery] = useState<string>('');
+  const [sourceSearchResults, setSourceSearchResults] = useState<any[]>([]);
+  const [sourceSearchLoading, setSourceSearchLoading] = useState(false);
+  const [isSearchMode, setIsSearchMode] = useState(false);
 
   useEffect(() => {
     const fetchDoubanData = async () => {
@@ -315,6 +333,152 @@ function HomeClient() {
     localStorage.setItem('hasSeenAnnouncement', announcement); // 记录已查看弹窗
   };
 
+  // 加载可用的视频源列表
+  const loadAvailableSources = async () => {
+    try {
+      const response = await fetch('/api/search/resources');
+      const sources = await response.json();
+      if (Array.isArray(sources)) {
+        setAvailableSources(sources.map(source => ({
+          key: source.key,
+          name: source.name
+        })));
+      }
+    } catch (error) {
+      console.error('加载视频源列表失败:', error);
+    }
+  };
+
+  // 加载指定源的分类信息
+  const loadSourceCategories = async (sourceKey: string) => {
+    try {
+      console.log('开始加载分类:', sourceKey);
+      const response = await fetch(`/api/sources/${sourceKey}/categories`);
+      console.log('分类API响应状态:', response.status);
+      const data = await response.json();
+      console.log('分类API响应数据:', data);
+      
+      if (data.categories && Array.isArray(data.categories)) {
+        setSourceCategories(data.categories);
+        console.log('设置sourceCategories:', data.categories.length);
+      }
+      if (data.categoryTree && Array.isArray(data.categoryTree)) {
+        setSourceCategoryTree(data.categoryTree);
+        console.log('设置sourceCategoryTree:', data.categoryTree.length);
+      }
+    } catch (error) {
+      console.error('加载分类失败:', error);
+      setSourceCategories([]);
+      setSourceCategoryTree([]);
+    }
+  };
+
+  // 加载指定源和分类下的视频列表
+  const loadSourceVideos = async (sourceKey: string, categoryId: string, page: number, append = false) => {
+    try {
+      setSourceLoading(true);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20'
+      });
+      if (categoryId && categoryId !== 'all') {
+        params.append('category', categoryId);
+      }
+      
+      const response = await fetch(`/api/sources/${sourceKey}/videos?${params}`);
+      const data = await response.json();
+      
+      if (data.videos && Array.isArray(data.videos)) {
+        if (append) {
+          setSourceVideos(prev => [...prev, ...data.videos]);
+        } else {
+          setSourceVideos(data.videos);
+        }
+        setSourcePagination(data.pagination);
+      }
+    } catch (error) {
+      console.error('加载视频列表失败:', error);
+    } finally {
+      setSourceLoading(false);
+    }
+  };
+
+  // 指定源搜索功能（联动分类）
+  const searchInSource = async (sourceKey: string, query: string, categoryId: string = selectedCategory) => {
+    if (!query.trim()) {
+      setIsSearchMode(false);
+      setSourceSearchResults([]);
+      return;
+    }
+
+    try {
+      setSourceSearchLoading(true);
+      setIsSearchMode(true);
+      
+      // 构建搜索参数，包含分类信息
+      const params = new URLSearchParams({
+        q: query.trim(),
+        source: sourceKey
+      });
+      
+      // 如果有选中的分类且不是"全部"，加入分类名称参数进行精确搜索
+      if (categoryId && categoryId !== 'all') {
+        // 从分类树中找到对应的分类名称
+        const findCategoryName = (categories: any[], id: string): string | null => {
+          for (const category of categories) {
+            if (category.id === id) {
+              return category.name;
+            }
+            if (category.children) {
+              const found = findCategoryName(category.children, id);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        
+        const categoryName = findCategoryName(sourceCategoryTree, categoryId);
+        if (categoryName) {
+          params.append('category', categoryName);
+        }
+      }
+      
+      const response = await fetch(`/api/search?${params.toString()}`);
+      const data = await response.json();
+      
+      if (data.regular_results && Array.isArray(data.regular_results)) {
+        setSourceSearchResults(data.regular_results);
+      } else {
+        setSourceSearchResults([]);
+      }
+    } catch (error) {
+      console.error('指定源搜索失败:', error);
+      setSourceSearchResults([]);
+    } finally {
+      setSourceSearchLoading(false);
+    }
+  };
+
+  // 清除搜索状态
+  const clearSourceSearch = () => {
+    setSourceSearchQuery('');
+    setSourceSearchResults([]);
+    setIsSearchMode(false);
+    // 重新加载当前分类的视频
+    if (selectedSource) {
+      setSourceVideos([]);
+      setSourcePage(1);
+      loadSourceVideos(selectedSource, selectedCategory, 1);
+    }
+  };
+
+  // 当切换到指定源标签页时加载视频源列表
+  useEffect(() => {
+    if (activeTab === 'sources') {
+      loadAvailableSources();
+    }
+  }, [activeTab]);
+
   return (
     <PageLayout>
       <div className='px-4 sm:px-8 lg:px-12 py-4 sm:py-8 overflow-visible'>
@@ -327,15 +491,253 @@ function HomeClient() {
             options={[
               { label: '首页', value: 'home' },
               { label: '收藏夹', value: 'favorites' },
+              { label: '指定源', value: 'sources' },
             ]}
             active={activeTab}
-            onChange={(value) => setActiveTab(value as 'home' | 'favorites')}
+            onChange={(value) => setActiveTab(value as 'home' | 'favorites' | 'sources')}
           />
         </div>
 
         {/* 主内容区域 - 优化为完全居中布局 */}
         <div className='w-full max-w-none mx-auto'>
-          {activeTab === 'favorites' ? (
+          {activeTab === 'sources' ? (
+            // 指定源视图
+            <>
+              {/* 视频源选择器和搜索框 */}
+              <section className='mb-6'>
+                <h2 className='text-xl font-bold text-gray-800 dark:text-gray-200 mb-4'>
+                  选择视频源
+                </h2>
+                <div className='flex flex-col sm:flex-row gap-4'>
+                  {/* 视频源选择器 */}
+                  <select
+                    value={selectedSource}
+                    onChange={(e) => {
+                      const newSource = e.target.value;
+                      console.log('选择视频源:', newSource);
+                      setSelectedSource(newSource);
+                      setSelectedCategory('all');
+                      setSourceVideos([]);
+                      setSourcePage(1);
+                      // 清除搜索状态
+                      clearSourceSearch();
+                      if (newSource) {
+                        console.log('开始加载分类:', newSource);
+                        loadSourceCategories(newSource);
+                        loadSourceVideos(newSource, 'all', 1);
+                      } else {
+                        setSourceCategories([]);
+                        setSourceCategoryTree([]);
+                      }
+                    }}
+                    className='flex-1 min-w-0 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors'
+                  >
+                    <option value=''>请选择视频源</option>
+                    {availableSources.map((source) => (
+                      <option key={source.key} value={source.key}>
+                        {source.name}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {/* 搜索框 */}
+                  {selectedSource && (
+                    <div className='flex-1 min-w-0 relative'>
+                      <input
+                        type='text'
+                        placeholder={`在 ${availableSources.find(s => s.key === selectedSource)?.name || '当前源'} 中搜索...`}
+                        value={sourceSearchQuery}
+                        onChange={(e) => {
+                          const newValue = e.target.value;
+                          setSourceSearchQuery(newValue);
+                          // 如果用户手动删除了所有内容，触发搜索显示当前分类下的所有视频
+                          if (newValue === '') {
+                            clearSourceSearch();
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && sourceSearchQuery.trim()) {
+                            searchInSource(selectedSource, sourceSearchQuery, selectedCategory);
+                          }
+                          if (e.key === 'Escape') {
+                            clearSourceSearch();
+                          }
+                        }}
+                        className='w-full px-4 py-3 pr-20 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors'
+                      />
+                      <div className='absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1'>
+                        {sourceSearchQuery && (
+                          <button
+                            onClick={clearSourceSearch}
+                            className='p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors'
+                            title='清除搜索'
+                          >
+                            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 20 20'>
+                              <path fillRule='evenodd' d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z' clipRule='evenodd' />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => sourceSearchQuery.trim() && searchInSource(selectedSource, sourceSearchQuery, selectedCategory)}
+                          disabled={!sourceSearchQuery.trim() || sourceSearchLoading}
+                          className='p-1 text-green-500 hover:text-green-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors'
+                          title='搜索'
+                        >
+                          {sourceSearchLoading ? (
+                            <div className='w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin'></div>
+                          ) : (
+                            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 20 20'>
+                              <path fillRule='evenodd' d='M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z' clipRule='evenodd' />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {selectedSource && (
+                <>
+                  {/* 分类选择器 - 横向树形结构 */}
+                  <section className='mb-6'>
+                    <h3 className='text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3'>
+                      分类筛选
+                    </h3>
+                    <HorizontalCategoryTree
+                      categories={sourceCategoryTree}
+                      selectedCategory={selectedCategory}
+                      onCategorySelect={(categoryId) => {
+                        setSelectedCategory(categoryId);
+                        if (isSearchMode && sourceSearchQuery.trim()) {
+                          // 如果在搜索模式下，重新执行搜索以应用新的分类筛选
+                          searchInSource(selectedSource, sourceSearchQuery, categoryId);
+                        } else {
+                          // 否则正常加载分类视频
+                          setSourceVideos([]);
+                          setSourcePage(1);
+                          loadSourceVideos(selectedSource, categoryId, 1);
+                        }
+                      }}
+                    />
+                  </section>
+
+                  {/* 视频列表 */}
+                  <section className='mb-8'>
+                    <div className='mb-4 flex items-center justify-between'>
+                      <h3 className='text-lg font-semibold text-gray-800 dark:text-gray-200'>
+                        {isSearchMode ? (
+                          <>
+                            搜索结果
+                            <span className='ml-2 text-sm text-gray-500 dark:text-gray-400'>
+                              “{sourceSearchQuery}”
+                              {selectedCategory !== 'all' && (
+                                <span className='ml-1'>
+                                  在 “{sourceCategoryTree.find(cat => cat.id === selectedCategory)?.name || 
+                                      sourceCategoryTree.find(cat => cat.children?.some((child: any) => child.id === selectedCategory))?.children?.find((child: any) => child.id === selectedCategory)?.name || 
+                                      '当前分类'}” 中
+                                </span>
+                              )}
+                              ({sourceSearchResults.length} 个结果)
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            视频列表
+                            {sourcePagination && (
+                              <span className='ml-2 text-sm text-gray-500 dark:text-gray-400'>
+                                (共 {sourcePagination.total_count} 部)
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </h3>
+                      {isSearchMode && (
+                        <button
+                          onClick={clearSourceSearch}
+                          className='text-sm text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors'
+                        >
+                          返回分类浏览
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* 根据模式显示不同内容 */}
+                    {isSearchMode ? (
+                      // 搜索模式
+                      sourceSearchLoading ? (
+                        <PaginatedRow itemsPerPage={15}>
+                          {Array.from({ length: 20 }).map((_, index) => (
+                            <div key={index} className='w-full max-w-44'>
+                              <div className='relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-green-200 animate-pulse dark:bg-green-800'>
+                                <div className='absolute inset-0 bg-green-300 dark:bg-green-700'></div>
+                              </div>
+                              <div className='mt-2 h-4 bg-green-200 rounded animate-pulse dark:bg-green-800'></div>
+                            </div>
+                          ))}
+                        </PaginatedRow>
+                      ) : sourceSearchResults.length > 0 ? (
+                        <PaginatedRow itemsPerPage={15}>
+                          {sourceSearchResults.map((video) => (
+                            <div key={video.id} className='w-full max-w-44'>
+                              <VideoCard
+                                {...video}
+                                from='search'
+                                type={video.episodes && video.episodes.length > 1 ? 'tv' : 'movie'}
+                              />
+                            </div>
+                          ))}
+                        </PaginatedRow>
+                      ) : (
+                        <div className='text-center text-gray-500 py-8 dark:text-gray-400'>
+                          未找到“{sourceSearchQuery}”的相关内容
+                        </div>
+                      )
+                    ) : (
+                      // 分类浏览模式
+                      sourceLoading ? (
+                        // 加载状态
+                        <PaginatedRow itemsPerPage={15}>
+                          {Array.from({ length: 20 }).map((_, index) => (
+                            <div key={index} className='w-full max-w-44'>
+                              <div className='relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-purple-200 animate-pulse dark:bg-purple-800'>
+                                <div className='absolute inset-0 bg-purple-300 dark:bg-purple-700'></div>
+                              </div>
+                              <div className='mt-2 h-4 bg-purple-200 rounded animate-pulse dark:bg-purple-800'></div>
+                            </div>
+                          ))}
+                        </PaginatedRow>
+                      ) : sourceVideos.length > 0 ? (
+                        <>
+                          {/* 视频网格 - 每行5个视频 */}
+                          <PaginatedRow itemsPerPage={15}>
+                            {sourceVideos.map((video) => (
+                              <div key={video.id} className='w-full max-w-44'>
+                                <VideoCard
+                                  {...video}
+                                  from='search'
+                                  type={video.episodes && video.episodes.length > 1 ? 'tv' : 'movie'}
+                                />
+                              </div>
+                            ))}
+                          </PaginatedRow>
+                          
+                          {/* 分页控件已移除 */}
+                        </>
+                      ) : (
+                        <div className='text-center text-gray-500 py-8 dark:text-gray-400'>
+                          {selectedSource ? '暂无视频内容' : '请先选择视频源'}
+                        </div>
+                      )
+                    )}
+                  </section>
+                </>
+              )}
+
+              {/* 指定源页面底部 Logo */}
+              <BottomKatelyaLogo />
+            </>
+          ) : activeTab === 'favorites' ? (
             // 收藏夹视图
             <>
               <section className='mb-8'>

@@ -17,6 +17,7 @@ export async function GET(request: Request) {
   const query = searchParams.get('q');
   const sourceFilter = searchParams.get('source'); // 单个视频源筛选
   const sourcesFilter = searchParams.get('sources'); // 多个视频源筛选（逗号分隔）
+  const categoryFilter = searchParams.get('category'); // 分类筛选
   
   // 从 Authorization header 或 query parameter 获取用户名
   let userName: string | undefined = searchParams.get('user') || undefined;
@@ -132,10 +133,36 @@ export async function GET(request: Request) {
       console.log(`搜索视频源: ${site.key} - ${site.name}`); // 调试信息
       return searchFromApi(site, query);
     });
-    const searchResults = (await Promise.all(searchPromises)).flat();
+    let searchResults = (await Promise.all(searchPromises)).flat();
     
     // 调试：检查搜索结果中的source_name
     console.log('\u641c索结果样本:', searchResults.slice(0, 2).map(r => ({title: r.title, source: r.source, source_name: r.source_name})));
+    
+    // 如果指定了分类筛选，过滤搜索结果
+    if (categoryFilter && categoryFilter !== 'all' && categoryFilter.trim() !== '') {
+      console.log(`应用分类过滤: ${categoryFilter}`);
+      const originalCount = searchResults.length;
+      
+      // 直接使用传入的分类名称进行匹配
+      const categoryName = categoryFilter.trim();
+      const simpleName = categoryName.replace(/片$/, ''); // 去掉后缀"片"
+      
+      searchResults = searchResults.filter(result => {
+        const resultCategory = result.class || result.type_name || '';
+        
+        return (
+          resultCategory === categoryName ||
+          resultCategory.includes(categoryName) ||
+          resultCategory.split(',').map(c => c.trim()).includes(categoryName) ||
+          (simpleName !== categoryName && (
+            resultCategory.includes(simpleName) ||
+            resultCategory.split(',').map(c => c.trim()).includes(simpleName)
+          ))
+        );
+      });
+      
+      console.log(`分类过滤: ${categoryFilter} -> ${searchResults.length}/${originalCount} 结果`);
+    }
 
     // 所有结果都作为常规结果返回，因为成人内容源已经在源头被过滤掉了
     const cacheTime = await getCacheTime();
