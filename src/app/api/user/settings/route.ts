@@ -73,10 +73,13 @@ export async function PATCH(request: NextRequest) {
 
     const storage = getStorage();
     
-    // 验证用户存在
-    const userExists = await storage.checkUserExist(userName);
-    if (!userExists) {
-      return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+    // 对于admin用户，我们不需要验证用户存在，因为admin用户可能没有在存储中注册
+    // 但仍然允许更新设置
+    if (userName !== process.env.USERNAME) {
+      const userExists = await storage.checkUserExist(userName);
+      if (!userExists) {
+        return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+      }
     }
 
     await storage.updateUserSettings(userName, settings);
@@ -123,10 +126,13 @@ export async function PUT(request: NextRequest) {
 
     const storage = getStorage();
     
-    // 验证用户存在
-    const userExists = await storage.checkUserExist(userName);
-    if (!userExists) {
-      return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+    // 对于admin用户，我们不需要验证用户存在，因为admin用户可能没有在存储中注册
+    // 但仍然允许更新设置
+    if (userName !== process.env.USERNAME) {
+      const userExists = await storage.checkUserExist(userName);
+      if (!userExists) {
+        return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+      }
     }
 
     await storage.setUserSettings(userName, settings);
