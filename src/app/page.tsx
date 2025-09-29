@@ -336,7 +336,15 @@ function HomeClient() {
   // 加载可用的视频源列表
   const loadAvailableSources = async () => {
     try {
-      const response = await fetch('/api/search/resources');
+      // 添加no-cache参数避免缓存问题
+      const response = await fetch('/api/search/resources?t=' + Date.now(), {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const sources = await response.json();
       if (Array.isArray(sources)) {
         setAvailableSources(sources.map(source => ({
@@ -395,6 +403,8 @@ function HomeClient() {
           setSourceVideos(data.videos);
         }
         setSourcePagination(data.pagination);
+        // 更新当前页码状态
+        setSourcePage(page);
       }
     } catch (error) {
       console.error('加载视频列表失败:', error);
@@ -477,6 +487,20 @@ function HomeClient() {
     if (activeTab === 'sources') {
       loadAvailableSources();
     }
+    
+    // 监听视频源更新事件
+    const handleSourcesUpdate = () => {
+      // 如果当前在指定源标签页，立即刷新视频源列表
+      if (activeTab === 'sources') {
+        loadAvailableSources();
+      }
+    };
+    
+    window.addEventListener('videoSourcesUpdated', handleSourcesUpdate);
+    
+    return () => {
+      window.removeEventListener('videoSourcesUpdated', handleSourcesUpdate);
+    };
   }, [activeTab]);
 
   return (
@@ -662,11 +686,44 @@ function HomeClient() {
                       )}
                     </div>
                     
+                    {/* 分页控件 - 只在非搜索模式下显示 */}
+                    {!isSearchMode && sourcePagination && sourcePagination.total_pages > 1 && (
+                      <div className='flex items-center justify-center mb-4 space-x-2'>
+                        <button
+                          onClick={() => {
+                            if (sourcePage > 1) {
+                              loadSourceVideos(selectedSource, selectedCategory, sourcePage - 1);
+                            }
+                          }}
+                          disabled={sourcePage === 1}
+                          className='px-3 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'
+                        >
+                          上一页
+                        </button>
+                        
+                        <span className='text-gray-700 dark:text-gray-300'>
+                          第 {sourcePage} 页 / 共 {sourcePagination.total_pages} 页
+                        </span>
+                        
+                        <button
+                          onClick={() => {
+                            if (sourcePage < sourcePagination.total_pages) {
+                              loadSourceVideos(selectedSource, selectedCategory, sourcePage + 1);
+                            }
+                          }}
+                          disabled={sourcePage === sourcePagination.total_pages}
+                          className='px-3 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'
+                        >
+                          下一页
+                        </button>
+                      </div>
+                    )}
+                    
                     {/* 根据模式显示不同内容 */}
                     {isSearchMode ? (
                       // 搜索模式
                       sourceSearchLoading ? (
-                        <PaginatedRow itemsPerPage={15}>
+                        <PaginatedRow itemsPerPage={20}>
                           {Array.from({ length: 20 }).map((_, index) => (
                             <div key={index} className='w-full max-w-44'>
                               <div className='relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-green-200 animate-pulse dark:bg-green-800'>
@@ -677,7 +734,7 @@ function HomeClient() {
                           ))}
                         </PaginatedRow>
                       ) : sourceSearchResults.length > 0 ? (
-                        <PaginatedRow itemsPerPage={15}>
+                        <PaginatedRow itemsPerPage={20}>
                           {sourceSearchResults.map((video) => (
                             <div key={video.id} className='w-full max-w-44'>
                               <VideoCard
@@ -697,7 +754,7 @@ function HomeClient() {
                       // 分类浏览模式
                       sourceLoading ? (
                         // 加载状态
-                        <PaginatedRow itemsPerPage={15}>
+                        <PaginatedRow itemsPerPage={20}>
                           {Array.from({ length: 20 }).map((_, index) => (
                             <div key={index} className='w-full max-w-44'>
                               <div className='relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-purple-200 animate-pulse dark:bg-purple-800'>
@@ -709,8 +766,13 @@ function HomeClient() {
                         </PaginatedRow>
                       ) : sourceVideos.length > 0 ? (
                         <>
-                          {/* 视频网格 - 每行5个视频 */}
-                          <PaginatedRow itemsPerPage={15}>
+                          {/* 视频网格 - 每行5个视频，现在显示4行共20个视频 */}
+                          <PaginatedRow 
+                            itemsPerPage={20}
+                            currentPage={sourcePage}
+                            onPageChange={(page) => loadSourceVideos(selectedSource, selectedCategory, page)}
+                            totalPages={sourcePagination?.total_pages}
+                          >
                             {sourceVideos.map((video) => (
                               <div key={video.id} className='w-full max-w-44'>
                                 <VideoCard

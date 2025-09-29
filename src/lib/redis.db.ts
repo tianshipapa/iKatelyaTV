@@ -433,8 +433,11 @@ function getRedisClient(): RedisClientType {
       throw new Error('REDIS_URL env variable not set');
     }
 
+    // 获取 Redis 密码
+    const redisPassword = process.env.REDIS_PASSWORD;
+
     // 创建客户端，配置重连策略
-    client = createClient({
+    const clientConfig: any = {
       url,
       socket: {
         // 重连策略：指数退避，最大30秒
@@ -452,7 +455,15 @@ function getRedisClient(): RedisClientType {
       },
       // 添加其他配置
       pingInterval: 30000, // 30秒ping一次，保持连接活跃
-    });
+    };
+
+    // 如果设置了密码，则添加到配置中
+    if (redisPassword && redisPassword.trim() !== '') {
+      clientConfig.password = redisPassword;
+      console.log('Redis password authentication enabled');
+    }
+
+    client = createClient(clientConfig);
 
     // 添加错误事件监听
     client.on('error', (err) => {

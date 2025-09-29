@@ -690,6 +690,15 @@ const VideoSourceConfig = ({
         throw new Error(data.error || `操作失败: ${resp.status}`);
       }
 
+      // 检查响应中是否有sourceUpdated标识
+      const responseData = await resp.json().catch(() => ({}));
+      if (responseData.sourceUpdated) {
+        // 发出自定义事件通知其他页面刷新视频源列表
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('videoSourcesUpdated'));
+        }
+      }
+
       // 成功后刷新配置
       await refreshConfig();
     } catch (err) {

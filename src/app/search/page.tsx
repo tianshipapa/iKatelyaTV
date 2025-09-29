@@ -108,7 +108,15 @@ function SearchPageClient() {
   // 加载所有可用的视频源列表（用于搜索框下拉选项）
   const loadAvailableSources = async () => {
     try {
-      const response = await fetch('/api/search/resources');
+      // 添加no-cache参数避免缓存问题
+      const response = await fetch('/api/search/resources?t=' + Date.now(), {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const sources = await response.json();
       if (Array.isArray(sources)) {
         setAvailableSources(sources.map(source => ({
@@ -150,6 +158,13 @@ function SearchPageClient() {
     // 加载可用的视频源列表
     loadAvailableSources();
 
+    // 监听视频源更新事件
+    const handleSourcesUpdate = () => {
+      loadAvailableSources();
+    };
+    
+    window.addEventListener('videoSourcesUpdated', handleSourcesUpdate);
+
     // 点击外部区域关闭下拉菜单
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -162,6 +177,7 @@ function SearchPageClient() {
     
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('videoSourcesUpdated', handleSourcesUpdate);
     };
 
   }, []);

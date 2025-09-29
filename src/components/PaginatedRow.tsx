@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState, useEffect } from 'react';
 
 interface PaginatedRowProps {
   children: React.ReactNode[];
@@ -10,6 +10,9 @@ interface PaginatedRowProps {
   onLoadMore?: () => Promise<void>; // 新增：加载更多数据的回调函数
   hasMoreData?: boolean; // 新增：是否还有更多数据可加载
   isLoading?: boolean; // 新增：是否正在加载中
+  currentPage?: number; // 新增：当前页码（从1开始）
+  onPageChange?: (page: number) => void; // 新增：页码变化回调
+  totalPages?: number; // 新增：总页数
 }
 
 export default function PaginatedRow({
@@ -19,10 +22,18 @@ export default function PaginatedRow({
   onLoadMore,
   hasMoreData = true,
   isLoading = false,
+  currentPage = 1,
+  onPageChange,
+  totalPages,
 }: PaginatedRowProps) {
   const [startIndex, setStartIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const uniqueId = useId(); // 为每个实例生成唯一ID
+
+  // 当外部currentPage变化时，更新内部startIndex
+  useEffect(() => {
+    setStartIndex((currentPage - 1) * itemsPerPage);
+  }, [currentPage, itemsPerPage]);
 
   // 获取当前显示的项目 - 支持无限向前浏览
   const currentItems = useMemo(() => {
@@ -40,6 +51,11 @@ export default function PaginatedRow({
 
   // 向前翻页 - 禁止超出第一页
   const handlePrevPage = () => {
+    if (onPageChange && currentPage > 1) {
+      onPageChange(currentPage - 1);
+      return;
+    }
+    
     setStartIndex((prev) => {
       const newIndex = prev - itemsPerPage;
       return newIndex < 0 ? 0 : newIndex; // 不允许小于0
@@ -48,6 +64,14 @@ export default function PaginatedRow({
 
   // 向后翻页 - 支持动态加载更多数据
   const handleNextPage = async () => {
+    // 如果有外部页码控制，使用外部控制
+    if (onPageChange && totalPages) {
+      if (currentPage < totalPages) {
+        onPageChange(currentPage + 1);
+      }
+      return;
+    }
+    
     const newIndex = startIndex + itemsPerPage;
     
     // 如果即将超出当前数据范围，且有更多数据可加载，且有加载回调函数
@@ -69,9 +93,11 @@ export default function PaginatedRow({
   };
 
   // 检查是否可以向前翻页
-  const canGoPrev = startIndex > 0;
-  // 检查是否可以向后翻页：有更多数据或者当前不在最后一页
-  const canGoNext = children.length > itemsPerPage && (startIndex + itemsPerPage < children.length || hasMoreData || startIndex + itemsPerPage >= children.length);
+  const canGoPrev = onPageChange ? currentPage > 1 : startIndex > 0;
+  // 检查是否可以向后翻页
+  const canGoNext = onPageChange && totalPages ? 
+    currentPage < totalPages : 
+    children.length > itemsPerPage && (startIndex + itemsPerPage < children.length || hasMoreData || startIndex + itemsPerPage >= children.length);
 
   // 如果没有足够的内容需要分页，就不显示按钮
   const needsPagination = children.length > itemsPerPage;

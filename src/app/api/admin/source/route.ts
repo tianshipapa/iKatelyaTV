@@ -175,8 +175,9 @@ export async function POST(request: NextRequest) {
       await (storage as any).setAdminConfig(adminConfig);
     }
 
+    // 返回成功响应，并添加一个标识用于前端更新视频源列表
     return NextResponse.json(
-      { ok: true },
+      { ok: true, sourceUpdated: true },
       {
         headers: {
           'Cache-Control': 'no-store',
